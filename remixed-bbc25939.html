@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>REVERSE Energy — SCADA Monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100vh;font-family:'JetBrains Mono','Courier New',monospace;background:radial-gradient(ellipse at 30% 20%,#1a2330 0%,#0d1117 40%,#080b0f 100%);color:#c8d6e5}
+:root{
+  --c:#00F2FF;--cd:rgba(0,242,255,0.15);--cg:rgba(0,242,255,0.4);
+  --o:#FF8A00;--od:rgba(255,138,0,0.15);--og:rgba(255,138,0,0.4);
+  --g:#00E676;--r:#FF3D57;
+  --gb:rgba(255,255,255,0.04);--gbr:rgba(255,255,255,0.08);
+  --gcb:rgba(0,242,255,0.22);--gob:rgba(255,138,0,0.22);
+  --tp:#e8f4f8;--ts:rgba(200,214,229,0.6);--tm:rgba(200,214,229,0.35)
+}
+.dash{max-width:1400px;margin:0 auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.glass{background:var(--gb);border:0.5px solid var(--gbr);border-radius:10px;backdrop-filter:blur(12px);transition:border-color .3s,box-shadow .3s}
+.glass:hover{border-color:rgba(0,242,255,0.16);box-shadow:0 0 20px rgba(0,242,255,0.04)}
+.glass.cb{border-color:var(--gcb)}.glass.ob{border-color:var(--gob)}
+.alert-node{border-color:rgba(255,61,87,0.5)!important;background:rgba(255,61,87,0.04)!important;box-shadow:0 0 30px rgba(255,61,87,0.18),inset 0 0 40px rgba(255,61,87,0.06)!important;animation:ap 1.5s ease-in-out infinite}
+@keyframes ap{0%,100%{box-shadow:0 0 24px rgba(255,61,87,0.15),inset 0 0 30px rgba(255,61,87,0.05)}50%{box-shadow:0 0 44px rgba(255,61,87,0.35),inset 0 0 55px rgba(255,61,87,0.12)}}
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;flex-wrap:wrap;gap:10px}
+.hdr-l{display:flex;align-items:center;gap:16px}
+.logo{font-size:13px;font-weight:700;letter-spacing:.15em;color:var(--c);text-transform:uppercase}
+.logo-s{font-size:9px;color:var(--tm);letter-spacing:.12em;margin-top:2px}
+.divv{width:.5px;height:32px;background:var(--gbr)}
+.badge{display:flex;align-items:center;gap:8px;padding:6px 12px;background:rgba(0,230,118,0.08);border:.5px solid rgba(0,230,118,0.25);border-radius:6px;font-size:10px;font-weight:700;color:var(--g);letter-spacing:.12em}
+.pulse{width:7px;height:7px;background:var(--g);border-radius:50%;box-shadow:0 0 8px var(--g);animation:pd 2s ease-in-out infinite}
+@keyframes pd{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+.hdr-r{display:flex;align-items:center;gap:20px}
+.hm{text-align:right}.hm .hl{font-size:9px;color:var(--tm);letter-spacing:.1em}.hm .hv{font-size:14px;color:var(--tp);font-weight:700}
+.hm .hv.sla{color:var(--c)}
+.hstats{display:flex;gap:24px}
+.dt{font-size:10px;color:var(--ts);white-space:nowrap}
+/* FLOW */
+.flow-s{padding:16px 20px}
+.slbl{font-size:9px;letter-spacing:.15em;color:var(--tm);text-transform:uppercase;margin-bottom:16px}
+.flow-nodes{display:flex;align-items:stretch;gap:0}
+.fn{flex:1;padding:16px;background:rgba(255,255,255,.025);border:.5px solid var(--gbr);border-radius:8px;transition:all .3s;cursor:pointer}
+.fn:hover{background:rgba(0,242,255,.05);border-color:var(--gcb);transform:translateY(-2px)}
+.fconn{display:flex;align-items:center;padding:0 8px;flex-shrink:0}
+.fline{width:32px;height:1px;background:linear-gradient(90deg,var(--cg),transparent);position:relative}
+.fline::after{content:'';position:absolute;right:-4px;top:-3px;border-left:6px solid var(--c);border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;opacity:.6}
+.fdot{width:6px;height:6px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c);animation:fd 2s ease-in-out infinite;margin-right:4px}
+@keyframes fd{0%,100%{opacity:1}50%{opacity:.3}}
+.nstep{font-size:8px;letter-spacing:.15em;color:var(--c);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.snum{width:16px;height:16px;border:.5px solid var(--c);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--c)}
+.ntitle{font-size:11px;font-weight:700;color:var(--tp);margin-bottom:12px;letter-spacing:.05em}
+.nm{margin-bottom:8px}.nm .nl{font-size:8px;color:var(--tm);letter-spacing:.1em;margin-bottom:3px}
+.nv{font-size:16px;font-weight:700}.nv.c{color:var(--c);text-shadow:0 0 12px var(--cg)}.nv.o{color:var(--o);text-shadow:0 0 12px var(--og)}.nv.w{color:var(--tp)}
+.nu{font-size:9px;font-weight:400;opacity:.7;margin-left:2px}
+.nst{margin-top:10px;display:flex;align-items:center;gap:5px}
+.nsd{width:5px;height:5px;border-radius:50%;background:var(--g);box-shadow:0 0 6px var(--g)}
+.nst-t{font-size:8px;color:var(--tm)}
+/* METRICS */
+.mrow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.mc{padding:18px 20px}
+.mc .mcl{font-size:9px;letter-spacing:.12em;color:var(--tm);margin-bottom:10px;text-transform:uppercase}
+.mc .mcv{font-size:36px;font-weight:700;line-height:1}
+.mcv.bo{color:var(--o);text-shadow:0 0 30px var(--og)}
+.mcv.bc{color:var(--c);text-shadow:0 0 30px var(--cg)}
+.mcv.bw{color:var(--tp)}
+.mc .mcs{font-size:9px;color:var(--tm);margin-top:6px}
+.mc .mcb{margin-top:12px;height:2px;background:rgba(255,255,255,.08);border-radius:1px;overflow:hidden}
+.mcf{height:100%;border-radius:1px;transition:width .5s}
+/* BOTTOM */
+.bot{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+.chart-s{padding:16px 20px}
+.chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.chtitle{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--ts);text-transform:uppercase}
+.legend{display:flex;gap:16px}
+.li{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--tm)}
+.ld{width:8px;height:2px;border-radius:1px}
+/* LOG */
+.log-s{padding:16px 20px}
+.log-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.logscroll{max-height:166px;overflow-y:auto}
+.logscroll::-webkit-scrollbar{width:2px}
+.logscroll::-webkit-scrollbar-thumb{background:var(--gbr);border-radius:1px}
+.entry{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:.5px solid rgba(255,255,255,.04);font-size:9px;animation:ls .4s ease}
+@keyframes ls{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.entry:last-child{border-bottom:none}
+.et{color:var(--tm);min-width:44px}
+.ei{width:5px;height:5px;border-radius:50%;margin-top:1px;flex-shrink:0}
+.ei.ok{background:var(--g);box-shadow:0 0 6px var(--g)}
+.ei.warn{background:var(--o);box-shadow:0 0 6px var(--o)}
+.ei.err{background:var(--r);box-shadow:0 0 6px var(--r)}
+.ei.info{background:var(--c);box-shadow:0 0 6px var(--c)}
+.em{color:var(--ts);line-height:1.5}
+.emod{color:var(--tm);margin-left:2px}
+.sbtn{background:transparent;border:.5px solid rgba(255,61,87,.4);color:rgba(255,61,87,.8);font-family:inherit;font-size:9px;font-weight:700;letter-spacing:.12em;padding:7px 14px;border-radius:5px;cursor:pointer;transition:all .2s;text-transform:uppercase}
+.sbtn:hover{background:rgba(255,61,87,.1);border-color:rgba(255,61,87,.7);color:var(--r)}
+.sbtn:active{transform:scale(.97)}
+@media(max-width:900px){.mrow{grid-template-columns:1fr 1fr}.flow-nodes{flex-direction:column}.fconn{display:none}.bot{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="dash">
+
+  <!-- HEADER -->
+  <div class="glass hdr">
+    <div class="hdr-l">
+      <div>
+        <div class="logo">⬡ REVERSE Energy</div>
+        <div class="logo-s">SCADA Monitor / Control Terminal v4.2.1</div>
+      </div>
+      <div class="divv"></div>
+      <div class="badge"><div class="pulse"></div>OPERATIONAL</div>
+    </div>
+    <div class="hdr-r">
+      <div class="hstats">
+        <div class="hm"><div class="hl">SLA</div><div class="hv sla">99.8%</div></div>
+        <div class="hm"><div class="hl">Uptime</div><div class="hv">847h 22m</div></div>
+        <div class="hm"><div class="hl">Active Nodes</div><div class="hv">12 / 12</div></div>
+      </div>
+      <div class="divv"></div>
+      <div class="dt" id="dt">--</div>
+    </div>
+  </div>
+
+  <!-- PROCESS FLOW -->
+  <div class="glass flow-s">
+    <div class="slbl">▸ Main Process Flow — Immersion Cooling + Heat Recovery Chain</div>
+    <div class="flow-nodes">
+      <div class="fn" id="n1" onclick="pingNode('n1')">
+        <div class="nstep"><div class="snum">1</div>STAGE 01</div>
+        <div class="ntitle">Immersion Tank</div>
+        <div class="nm"><div class="nl">ASIC Hashrate</div><div class="nv c" id="hashrate">842<span class="nu">TH/s</span></div></div>
+        <div class="nm"><div class="nl">Coolant Temp</div><div class="nv w" id="coolant">43.2<span class="nu">°C</span></div></div>
+        <div class="nst"><div class="nsd"></div><div class="nst-t">Nominal — Fluid Level OK</div></div>
+      </div>
+      <div class="fconn"><div class="fdot"></div><div class="fline"></div></div>
+      <div class="fn" id="n2" onclick="pingNode('n2')">
+        <div class="nstep"><div class="snum">2</div>STAGE 02</div>
+        <div class="ntitle">Heat Pump</div>
+        <div class="nm"><div class="nl">Compression Ratio</div><div class="nv c" id="cratio">4.8<span class="nu">:1</span></div></div>
+        <div class="nm"><div class="nl">Outlet Temp</div><div class="nv o" id="hpout">62.4<span class="nu">°C</span></div></div>
+        <div class="nst"><div class="nsd"></div><div class="nst-t">COP 3.9 — Within Spec</div></div>
+      </div>
+      <div class="fconn"><div class="fdot"></div><div class="fline"></div></div>
+      <div class="fn" id="n3" onclick="pingNode('n3')">
+        <div class="nstep"><div class="snum">3</div>STAGE 03</div>
+        <div class="ntitle">Modular Hydro-Unit</div>
+        <div class="nm"><div class="nl">Water Flow Rate</div><div class="nv c" id="flow">18.6<span class="nu">L/min</span></div></div>
+        <div class="nm"><div class="nl">Return Temp</div><div class="nv o" id="rtemp">38.7<span class="nu">°C</span></div></div>
+        <div class="nst"><div class="nsd"></div><div class="nst-t">ΔT 23.7°C — Stable</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- METRIC CARDS -->
+  <div class="mrow">
+    <div class="glass mc ob">
+      <div class="mcl">Outlet Water Temp</div>
+      <div class="mcv bo">65<span style="font-size:18px">°C</span></div>
+      <div class="mcs">Target range: 55 – 70°C · Δ +0.4°C/hr</div>
+      <div class="mcb"><div class="mcf" style="width:71%;background:linear-gradient(90deg,var(--od),var(--o))"></div></div>
+    </div>
+    <div class="glass mc cb">
+      <div class="mcl">Energy Recovery Efficiency</div>
+      <div class="mcv bc">97<span style="font-size:18px">%</span></div>
+      <div class="mcs">Thermal yield from ASIC waste heat</div>
+      <div class="mcb"><div class="mcf" style="width:97%;background:linear-gradient(90deg,var(--cd),var(--c))"></div></div>
+    </div>
+    <div class="glass mc">
+      <div class="mcl">Regional Power Deficit Context</div>
+      <div class="mcv bw">1,564<span style="font-size:16px;color:var(--ts)"> MW</span></div>
+      <div class="mcs">Grid demand shortfall · Local offset: 2.1 MW</div>
+      <div class="mcb"><div class="mcf" style="width:38%;background:linear-gradient(90deg,rgba(200,214,229,.07),rgba(200,214,229,.28))"></div></div>
+    </div>
+  </div>
+
+  <!-- CHARTS + LOG -->
+  <div class="bot">
+    <div class="glass chart-s">
+      <div class="chart-hdr">
+        <div class="chtitle">Real-Time Telemetry</div>
+        <div class="legend">
+          <div class="li"><div class="ld" style="background:var(--o)"></div>Thermal Power (kW)</div>
+          <div class="li"><div class="ld" style="background:var(--c);height:1px;border-top:1px dashed var(--c)"></div>Digital Revenue (Sats/hr)</div>
+        </div>
+      </div>
+      <div style="position:relative;height:190px">
+        <canvas id="chart" role="img" aria-label="Live dual-axis line chart: Thermal Power Output in kW (orange) and Digital Revenue in Sats/hr (cyan dashed) over the last 40 seconds"></canvas>
+      </div>
+    </div>
+    <div class="glass log-s">
+      <div class="log-hdr">
+        <div class="chtitle">System Log</div>
+        <button class="sbtn" onclick="simulateAlert()">⚠ Simulate Alert</button>
+      </div>
+      <div class="logscroll" id="log">
+        <div class="entry"><span class="et">14:32:11</span><div class="ei ok"></div><span class="em">Flow Rate Stabilized <span class="emod">— hydro-unit-01</span></span></div>
+        <div class="entry"><span class="et">14:31:58</span><div class="ei ok"></div><span class="em">SLA Check Passed <span class="emod">— system</span></span></div>
+        <div class="entry"><span class="et">14:30:44</span><div class="ei info"></div><span class="em">Heat Pump COP updated <span class="emod">— hp-main</span></span></div>
+        <div class="entry"><span class="et">14:29:17</span><div class="ei ok"></div><span class="em">Hashrate target 840 TH/s reached <span class="emod">— asic-cluster</span></span></div>
+        <div class="entry"><span class="et">14:28:03</span><div class="ei warn"></div><span class="em">Outlet temp +0.4°C deviation <span class="emod">— sensor-T04</span></span></div>
+        <div class="entry"><span class="et">14:27:51</span><div class="ei ok"></div><span class="em">Watchdog heartbeat OK <span class="emod">— plc-01</span></span></div>
+        <div class="entry"><span class="et">14:26:39</span><div class="ei info"></div><span class="em">Efficiency recalculated: 97.1% <span class="emod">— thermal-mgr</span></span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+// --- DATETIME
+function tick(){
+  const n=new Date();
+  document.getElementById('dt').textContent=
+    n.toLocaleDateString('en-CA',{weekday:'short',year:'numeric',month:'short',day:'2-digit'})+
+    '  '+n.toLocaleTimeString('en-CA',{hour12:false});
+}
+setInterval(tick,1000);tick();
+
+// --- CHART
+const PTS=40;
+let td=[],rd=[],lb=[];
+for(let i=0;i<PTS;i++){
+  td.push(+(120+Math.random()*30-15).toFixed(1));
+  rd.push(+(4800+Math.random()*600-300).toFixed(0));
+  lb.push('');
+}
+const ctx=document.getElementById('chart').getContext('2d');
+const chart=new Chart(ctx,{
+  type:'line',
+  data:{labels:lb,datasets:[
+    {label:'Thermal Power (kW)',data:td,borderColor:'#FF8A00',backgroundColor:'rgba(255,138,0,0.06)',borderWidth:1.5,pointRadius:0,fill:true,tension:0.4,yAxisID:'y1'},
+    {label:'Digital Revenue (Sats/hr)',data:rd,borderColor:'#00F2FF',backgroundColor:'rgba(0,242,255,0.05)',borderWidth:1.5,pointRadius:0,fill:true,tension:0.4,yAxisID:'y2',borderDash:[4,3]}
+  ]},
+  options:{
+    responsive:true,maintainAspectRatio:false,animation:{duration:250},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(8,11,15,0.92)',titleColor:'#c8d6e5',bodyColor:'#c8d6e5',borderColor:'rgba(0,242,255,0.2)',borderWidth:0.5,titleFont:{family:'JetBrains Mono,monospace',size:9},bodyFont:{family:'JetBrains Mono,monospace',size:9}}},
+    scales:{
+      x:{display:false},
+      y1:{type:'linear',position:'left',grid:{color:'rgba(255,255,255,0.05)',lineWidth:0.5},ticks:{color:'#FF8A00',font:{family:'JetBrains Mono,monospace',size:9},callback:v=>v+' kW',maxTicksLimit:5},border:{color:'rgba(255,138,0,0.2)',width:0.5}},
+      y2:{type:'linear',position:'right',grid:{drawOnChartArea:false},ticks:{color:'#00F2FF',font:{family:'JetBrains Mono,monospace',size:9},callback:v=>v+' S',maxTicksLimit:5},border:{color:'rgba(0,242,255,0.2)',width:0.5}}
+    }
+  }
+});
+
+// --- LIVE METRICS
+let tpow=124.5,sats=4850,cool=43.2,hpout=62.4,rtemp=38.7,hash=842,cr=4.8,flow=18.6;
+function nudge(v,r,mn,mx){return Math.min(mx,Math.max(mn,v+(Math.random()-.5)*r));}
+function upd(){
+  tpow=nudge(tpow,4,100,150);sats=nudge(sats,120,4200,5400);
+  cool=nudge(cool,0.4,40,47);hpout=nudge(hpout,0.5,58,68);
+  rtemp=nudge(rtemp,0.3,36,42);hash=nudge(hash,8,820,870);
+  cr=nudge(cr,0.1,4.5,5.2);flow=nudge(flow,0.3,17,20.5);
+  td.push(+tpow.toFixed(1));rd.push(+sats.toFixed(0));td.shift();rd.shift();
+  chart.update('none');
+  document.getElementById('hashrate').innerHTML=Math.round(hash)+'<span class="nu">TH/s</span>';
+  document.getElementById('coolant').innerHTML=cool.toFixed(1)+'<span class="nu">°C</span>';
+  document.getElementById('cratio').innerHTML=cr.toFixed(1)+'<span class="nu">:1</span>';
+  document.getElementById('hpout').innerHTML=hpout.toFixed(1)+'<span class="nu">°C</span>';
+  document.getElementById('flow').innerHTML=flow.toFixed(1)+'<span class="nu">L/min</span>';
+  document.getElementById('rtemp').innerHTML=rtemp.toFixed(1)+'<span class="nu">°C</span>';
+}
+setInterval(upd,1500);
+
+// --- NODE PING
+function pingNode(id){
+  const el=document.getElementById(id);
+  if(el.classList.contains('alert-node'))return;
+  el.style.background='rgba(0,242,255,0.08)';
+  setTimeout(()=>{el.style.background='';},700);
+}
+
+// --- SIMULATE ALERT
+const alerts=[
+  {node:'n2',msg:'Outlet temp spike: 68.1°C',src:'hp-main',type:'err'},
+  {node:'n3',msg:'Flow rate drop: 15.2 L/min',src:'hydro-pump-02',type:'err'},
+  {node:'n1',msg:'Coolant level warning: −3%',src:'tank-sensor-01',type:'err'},
+];
+let ai=0,at=null;
+function addLog(t,cls,msg,src){
+  const log=document.getElementById('log');
+  const e=document.createElement('div');e.className='entry';
+  e.innerHTML=`<span class="et">${t}</span><div class="ei ${cls}"></div><span class="em">${msg} <span class="emod">— ${src}</span></span>`;
+  log.insertBefore(e,log.firstChild);
+}
+function simulateAlert(){
+  const a=alerts[ai%alerts.length];ai++;
+  ['n1','n2','n3'].forEach(id=>document.getElementById(id).classList.remove('alert-node'));
+  document.getElementById(a.node).classList.add('alert-node');
+  const t=new Date().toLocaleTimeString('en-CA',{hour12:false});
+  addLog(t,'err',`<strong style="color:#FF3D57">${a.msg}</strong>`,a.src);
+  if(at)clearTimeout(at);
+  at=setTimeout(()=>{
+    document.getElementById(a.node).classList.remove('alert-node');
+    const t2=new Date().toLocaleTimeString('en-CA',{hour12:false});
+    addLog(t2,'ok','Alert cleared — auto-recovery confirmed',a.src);
+  },5000);
+}
+</script>
+</body>
+</html>
